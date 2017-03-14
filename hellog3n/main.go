@@ -41,7 +41,7 @@ func main() {
 	}
 
 	// Sets the OpenGL viewport size the same as the window size
-	// This should be updated if the window is resized.
+	// This normally should be updated if the window is resized.
 	width, height := win.GetSize()
 	gs.Viewport(0, 0, int32(width), int32(height))
 
