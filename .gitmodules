@@ -1,0 +1,3 @@
+[submodule "gopher/assets"]
+	path = gopher/assets
+	url = https://github.com/golang-samples/gopher-3d.git
