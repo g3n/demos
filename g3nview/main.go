@@ -12,6 +12,7 @@ import (
 	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
+	"github.com/g3n/engine/gui/assets"
 	"github.com/g3n/engine/light"
 	"github.com/g3n/engine/loader/collada"
 	"github.com/g3n/engine/loader/obj"
@@ -34,12 +35,18 @@ type Context struct {
 	dirLight *light.Directional
 	cam      *camera.Perspective
 	root     *gui.Root
-	tb       *toolBar
 	axis     *graphic.AxisHelper
 	grid     *graphic.GridHelper
 	models   []*core.Node
+	ui       *guiState
 }
 
+const (
+	checkON  = assets.CheckBox
+	checkOFF = assets.CheckBoxOutlineBlank
+)
+
+// Package logger
 var log *logger.Logger
 
 func main() {
@@ -81,7 +88,7 @@ func main() {
 
 	// Creates root panel for GUI
 	ctx.root = gui.NewRoot(gs, win)
-	buildGui(ctx)
+	setupGui(ctx)
 
 	// Adds white ambient light to the scene
 	ctx.ambLight = light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.5)
@@ -168,126 +175,119 @@ func onWinResize(ctx *Context) {
 	ctx.root.SetSize(float32(width), float32(height))
 }
 
-type toolBar struct {
-	gui.Panel
-	ctx *Context
-	mb  *gui.Menu
-	fs  *FileSelect
-	ed  *ErrorDialog
+type guiState struct {
+	ctx      *Context
+	mb       *gui.Menu
+	fs       *FileSelect
+	ed       *ErrorDialog
+	viewAxis bool
+	viewGrid bool
 }
 
-func NewToolbar(ctx *Context) *toolBar {
+// setupGui builds the gui
+func setupGui(ctx *Context) *guiState {
 
-	// Creates toolbar container panel
-	tb := new(toolBar)
-	tb.Panel.Initialize(0, 32)
-	tb.Panel.SetColor(&math32.White)
-	tb.ctx = ctx
-	ctx.root.Add(tb)
-	ctx.root.Subscribe(gui.OnResize, func(evname string, ev interface{}) {
-		tb.onResize()
-	})
-
-	// Set the toolbar layout
-	hbl := gui.NewHBoxLayout()
-	tb.Panel.SetLayout(hbl)
+	ui := new(guiState)
+	ui.ctx = ctx
+	ctx.ui = ui
 
 	// Create menu bar and adds it to the toolbar
-	tb.mb = gui.NewMenuBar()
-	tb.mb.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
-	//styles := gui.StyleDefault.Menu
-	//tb.mb.SetStyles(styles)
-	tb.Add(tb.mb)
+	ui.mb = gui.NewMenuBar()
+	ui.mb.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
+	ui.ctx.root.Add(ui.mb)
+	ctx.root.Subscribe(gui.OnResize, func(evname string, ev interface{}) {
+		ui.onResize()
+	})
 
 	// Create "File" menu and adds it to the menu bar
 	m1 := gui.NewMenu()
 	m1.AddOption("Open model").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		tb.fs.SetVisible(true)
+		ui.fs.SetVisible(true)
 	})
 	m1.AddOption("Clear scene").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
 		clearScene(ctx)
 	})
 	m1.AddSeparator()
 	m1.AddOption("Quit").SetId("quit").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		tb.ctx.win.SetShouldClose(true)
+		ui.ctx.win.SetShouldClose(true)
 	})
-	tb.mb.AddMenu("File", m1)
+	ui.mb.AddMenu("File", m1)
 
-	// Adds spacer
-	sp := gui.NewPanel(8, 0)
-	sp.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
-	sp.SetRenderable(false)
-	tb.Add(sp)
-
-	// Create grid checkbox and adds it to the menu bar
-	cbGrid := gui.NewCheckBox("Show grid helper")
-	cbGrid.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
-	cbGrid.Subscribe(gui.OnChange, func(name string, ev interface{}) {
-		tb.ctx.grid.SetVisible(cbGrid.Value())
+	m2 := gui.NewMenu()
+	vAxis := m2.AddOption("View axis helper").SetIcon(checkOFF)
+	vAxis.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
+		if ui.viewAxis {
+			vAxis.SetIcon(checkOFF)
+			ui.viewAxis = false
+		} else {
+			vAxis.SetIcon(checkON)
+			ui.viewAxis = true
+		}
+		ctx.axis.SetVisible(ui.viewAxis)
 	})
-	tb.Add(cbGrid)
-
-	// Adds spacer
-	sp = gui.NewPanel(8, 0)
-	sp.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
-	tb.Add(sp)
-
-	// Create axis checkbox and adds it to the menu bar
-	cbAxis := gui.NewCheckBox("Show axis helper")
-	cbAxis.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
-	cbAxis.Subscribe(gui.OnChange, func(name string, ev interface{}) {
-		tb.ctx.axis.SetVisible(cbAxis.Value())
+	vGrid := m2.AddOption("View grid helper").SetIcon(checkOFF)
+	vGrid.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
+		if ui.viewGrid {
+			vGrid.SetIcon(checkOFF)
+			ui.viewGrid = false
+		} else {
+			vGrid.SetIcon(checkON)
+			ui.viewGrid = true
+		}
+		ctx.grid.SetVisible(ui.viewGrid)
 	})
-	tb.Add(cbAxis)
+	ui.mb.AddMenu("View", m2)
 
 	// Creates file select
-	tb.fs = NewFileSelect(400, 300)
-	tb.fs.SetVisible(false)
-	tb.fs.Subscribe("OnOK", func(evname string, ev interface{}) {
-		fpath := tb.fs.Selected()
+	ui.fs = NewFileSelect(400, 300)
+	ui.fs.SetVisible(false)
+	ui.fs.Subscribe("OnOK", func(evname string, ev interface{}) {
+		fpath := ui.fs.Selected()
 		if fpath == "" {
-			tb.ed.Show("File not selected")
+			ui.ed.Show("File not selected")
 			return
 		}
-		err := openModel(tb.ctx, fpath)
+		err := openModel(ui.ctx, fpath)
 		if err != nil {
-			tb.ed.Show(err.Error())
+			ui.ed.Show(err.Error())
 			return
 		}
-		tb.fs.SetVisible(false)
+		ui.fs.SetVisible(false)
 
 	})
-	tb.fs.Subscribe("OnCancel", func(evname string, ev interface{}) {
-		tb.fs.SetVisible(false)
+	ui.fs.Subscribe("OnCancel", func(evname string, ev interface{}) {
+		ui.fs.SetVisible(false)
 	})
-	tb.ctx.root.Add(tb.fs)
+	ui.ctx.root.Add(ui.fs)
 
 	// Creates error dialog
-	tb.ed = NewErrorDialog(440, 100)
-	tb.ctx.root.Add(tb.ed)
+	ui.ed = NewErrorDialog(440, 100)
+	ui.ctx.root.Add(ui.ed)
 
-	return tb
+	return ui
 }
 
-func (tb *toolBar) onResize() {
+// onResize is called when the root panel is resized and sets
+// the size and position of the gui elements
+func (ui *guiState) onResize() {
 
-	// Sets toolbar width
-	width, height := tb.ctx.win.GetSize()
-	tb.SetWidth(float32(width))
+	// Sets menu width
+	width, height := ui.ctx.win.GetSize()
+	ui.mb.SetWidth(float32(width))
 
 	// Center file selects
-	w := tb.fs.Width()
-	h := tb.fs.Height()
+	w := ui.fs.Width()
+	h := ui.fs.Height()
 	px := (float32(width) - w) / 2
 	py := (float32(height) - h) / 2
-	tb.fs.SetPosition(px, py)
+	ui.fs.SetPosition(px, py)
 
 	// Center error dialog
-	w = tb.ed.Width()
-	h = tb.ed.Height()
+	w = ui.ed.Width()
+	h = ui.ed.Height()
 	px = (float32(width) - w) / 2
 	py = (float32(height) - h) / 2
-	tb.ed.SetPosition(px, py)
+	ui.ed.SetPosition(px, py)
 }
 
 func openModel(ctx *Context, fpath string) error {
@@ -350,9 +350,4 @@ func clearScene(ctx *Context) {
 		ctx.scene.Remove(model)
 		model.Dispose()
 	}
-}
-
-func buildGui(ctx *Context) {
-
-	ctx.tb = NewToolbar(ctx)
 }
