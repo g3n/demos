@@ -24,6 +24,7 @@ func NewFileSelect(width, height float32) *FileSelect {
 	fs.SetBorders(2, 2, 2, 2)
 	fs.SetPaddings(4, 4, 4, 4)
 	fs.SetColor(&math32.White)
+	fs.SetVisible(false)
 
 	// Set vertical box layout for the whole panel
 	l := gui.NewVBoxLayout()

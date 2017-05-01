@@ -41,7 +41,7 @@ func NewErrorDialog(width, height float32) *ErrorDialog {
 	return e
 }
 
-func (e *ErrorDialog) SetText(msg string) {
+func (e *ErrorDialog) Show(msg string) {
 
 	e.msg.SetText(msg)
 	e.SetVisible(true)

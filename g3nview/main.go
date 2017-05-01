@@ -248,7 +248,7 @@ func NewToolbar(ctx *Context) *toolBar {
 
 	// Creates error dialog
 	tb.ed = NewErrorDialog(440, 100)
-	tb.ed.SetText("Error message is written here")
+	tb.ed.Show("Error message is written here")
 	tb.ctx.root.Add(tb.ed)
 
 	return tb
