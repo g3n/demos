@@ -37,6 +37,9 @@ func NewFileSelect(width, height float32) *FileSelect {
 	// Creates list
 	fs.list = gui.NewVList(0, 0)
 	fs.list.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 5, AlignH: gui.AlignWidth})
+	fs.list.Subscribe(gui.OnChange, func(evname string, ev interface{}) {
+		fs.onSelect()
+	})
 	fs.Add(fs.list)
 
 	// Button container panel
@@ -47,6 +50,7 @@ func NewFileSelect(width, height float32) *FileSelect {
 	bc.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 1, AlignH: gui.AlignWidth})
 	fs.Add(bc)
 
+	// Creates OK button
 	fs.bok = gui.NewButton("OK")
 	fs.bok.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
 	fs.bok.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
@@ -54,19 +58,15 @@ func NewFileSelect(width, height float32) *FileSelect {
 	})
 	bc.Add(fs.bok)
 
+	// Creates Cancel button
 	fs.bcan = gui.NewButton("Cancel")
 	fs.bcan.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
 	fs.bcan.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
 		fs.Dispatch("OnCancel", nil)
 	})
-
-	fs.list.Subscribe(gui.OnChange, func(evname string, ev interface{}) {
-		fs.onSelect()
-
-	})
-
 	bc.Add(fs.bcan)
 
+	// Sets initial directory
 	path, err := os.Getwd()
 	if err != nil {
 		log.Error("%s", err)
@@ -118,8 +118,11 @@ func (fs *FileSelect) SetPath(path string) error {
 
 func (fs *FileSelect) Selected() string {
 
-	sel := fs.list.Selected()[0]
-	label := sel.(*gui.ImageLabel)
+	selist := fs.list.Selected()
+	if len(selist) == 0 {
+		return ""
+	}
+	label := selist[0].(*gui.ImageLabel)
 	text := label.Text()
 	return filepath.Join(fs.path.Text(), text)
 }

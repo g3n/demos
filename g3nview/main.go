@@ -167,6 +167,7 @@ type toolBar struct {
 	ctx *Context
 	mb  *gui.Menu
 	fs  *FileSelect
+	ed  *ErrorDialog
 }
 
 func NewToolbar(ctx *Context) *toolBar {
@@ -242,8 +243,13 @@ func NewToolbar(ctx *Context) *toolBar {
 		log.Debug("OnCancel")
 		tb.fs.SetVisible(false)
 	})
-	tb.fs.SetPath("/")
+	//tb.fs.SetPath("/")
 	tb.ctx.root.Add(tb.fs)
+
+	// Creates error dialog
+	tb.ed = NewErrorDialog(440, 100)
+	tb.ed.SetText("Error message is written here")
+	tb.ctx.root.Add(tb.ed)
 
 	return tb
 }
@@ -260,6 +266,13 @@ func (tb *toolBar) onResize() {
 	px := (float32(width) - w) / 2
 	py := (float32(height) - h) / 2
 	tb.fs.SetPosition(px, py)
+
+	// Center error dialog
+	w = tb.ed.Width()
+	h = tb.ed.Height()
+	px = (float32(width) - w) / 2
+	py = (float32(height) - h) / 2
+	tb.ed.SetPosition(px, py)
 }
 
 func (tb *toolBar) openModel() {
