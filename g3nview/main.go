@@ -163,19 +163,20 @@ func onWinResize(ctx *Context) {
 }
 
 type toolBar struct {
-	*gui.Panel
+	gui.Panel
 	ctx *Context
 	mb  *gui.Menu
+	fs  *FileSelect
 }
 
 func NewToolbar(ctx *Context) *toolBar {
 
 	// Creates toolbar container panel
 	tb := new(toolBar)
-	tb.Panel = gui.NewPanel(400, 32)
+	tb.Panel.Initialize(0, 32)
 	tb.Panel.SetColor(&math32.White)
 	tb.ctx = ctx
-	ctx.root.Add(tb.Panel)
+	ctx.root.Add(tb)
 	ctx.root.Subscribe(gui.OnResize, func(evname string, ev interface{}) {
 		tb.onResize()
 	})
@@ -229,18 +230,42 @@ func NewToolbar(ctx *Context) *toolBar {
 	})
 	tb.Add(cbAxis)
 
+	// Creates file select
+	tb.fs = NewFileSelect(400, 300)
+	tb.fs.SetVisible(false)
+	tb.fs.Subscribe("OnOK", func(evname string, ev interface{}) {
+		log.Debug("OnOK:%s", tb.fs.Selected())
+		tb.fs.SetVisible(false)
+
+	})
+	tb.fs.Subscribe("OnCancel", func(evname string, ev interface{}) {
+		log.Debug("OnCancel")
+		tb.fs.SetVisible(false)
+	})
+	tb.fs.SetPath("/")
+	tb.ctx.root.Add(tb.fs)
+
 	return tb
 }
 
 func (tb *toolBar) onResize() {
 
-	width, _ := tb.ctx.win.GetSize()
+	// Sets toolbar width
+	width, height := tb.ctx.win.GetSize()
 	tb.SetWidth(float32(width))
+
+	// Center file selects
+	w := tb.fs.Width()
+	h := tb.fs.Height()
+	px := (float32(width) - w) / 2
+	py := (float32(height) - h) / 2
+	tb.fs.SetPosition(px, py)
 }
 
 func (tb *toolBar) openModel() {
 
-	log.Debug("openModel")
+	log.Debug("openModel not implemented yet")
+	tb.fs.SetVisible(true)
 }
 
 func buildGui(ctx *Context) {
