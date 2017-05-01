@@ -5,6 +5,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/camera/control"
@@ -52,6 +53,10 @@ const (
 var log *logger.Logger
 
 func main() {
+
+	// Parse command line parameters
+	flag.Usage = usage
+	flag.Parse()
 
 	// Creates window and OpenGL context
 	win, err := window.New("glfw", 800, 600, "Viewer", false)
@@ -111,11 +116,6 @@ func main() {
 	ctx.camPos = math32.Vector3{8.3, 4.7, 3.7}
 	ctx.cam.SetPositionVec(&ctx.camPos)
 
-	// Subscribe to window resize events
-	win.Subscribe(window.OnWindowSize, func(evname string, ev interface{}) {
-		onWinResize(ctx)
-	})
-
 	// Add an axis helper to the scene initially not visible
 	ctx.axis = graphic.NewAxisHelper(2)
 	ctx.axis.SetVisible(false)
@@ -133,10 +133,23 @@ func main() {
 		panic(err)
 	}
 
+	// Subscribe to window resize events
+	win.Subscribe(window.OnWindowSize, func(evname string, ev interface{}) {
+		onWinResize(ctx)
+	})
+	onWinResize(ctx)
+
 	// Sets window background color
 	gs.ClearColor(0.6, 0.6, 0.6, 1.0)
 
-	onWinResize(ctx)
+	// Try to load models specified in the command line
+	for _, m := range flag.Args() {
+		log.Debug("m:%v", m)
+		err = openModel(ctx, m)
+		if err != nil {
+			log.Error("%s", err)
+		}
+	}
 
 	// Render loop
 	for !win.ShouldClose() {
@@ -161,6 +174,14 @@ func main() {
 		win.SwapBuffers()
 		win.PollEvents()
 	}
+}
+
+// usage shows the application usage
+func usage() {
+
+	fmt.Fprintf(os.Stderr, "usage: g3nview [model]\n")
+	flag.PrintDefaults()
+	os.Exit(2)
 }
 
 // winResizeEvent is called when the window resize event is received
@@ -208,8 +229,8 @@ func setupGui(ctx *Context) *guiState {
 	m1.AddOption("Open model").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
 		ui.fs.SetVisible(true)
 	})
-	m1.AddOption("Clear scene").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		clearScene(ctx)
+	m1.AddOption("Remove models").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
+		removeModels(ctx)
 	})
 	m1.AddOption("Reset camera").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
 		ctx.cam.SetPositionVec(&ctx.camPos)
@@ -284,7 +305,7 @@ func (ui *guiState) onResize() {
 	width, height := ui.ctx.win.GetSize()
 	ui.mb.SetWidth(float32(width))
 
-	// Center file selects
+	// Center file select
 	w := ui.fs.Width()
 	h := ui.fs.Height()
 	px := (float32(width) - w) / 2
@@ -351,8 +372,8 @@ func openModel(ctx *Context, fpath string) error {
 	return fmt.Errorf("Unrecognized model file extension:[%s]", ext)
 }
 
-// clearScene removes and disposes of all loaded models in the scene
-func clearScene(ctx *Context) {
+// removeModels removes and disposes of all loaded models in the scene
+func removeModels(ctx *Context) {
 
 	for i := 0; i < len(ctx.models); i++ {
 		model := ctx.models[i]
