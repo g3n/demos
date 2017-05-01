@@ -93,7 +93,7 @@ func main() {
 	// Creates scene for 3D objects
 	ctx.scene = core.NewNode()
 
-	// Creates root panel for GUI
+	// Creates root panel for GUI and sets the GUI
 	ctx.root = gui.NewRoot(gs, win)
 	setupGui(ctx)
 
@@ -179,7 +179,7 @@ func main() {
 // usage shows the application usage
 func usage() {
 
-	fmt.Fprintf(os.Stderr, "usage: g3nview [model]\n")
+	fmt.Fprintf(os.Stderr, "usage: g3nview [model1 model2   modelN]\n")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
