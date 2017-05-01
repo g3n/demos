@@ -154,7 +154,7 @@ func (fs *FileSelect) onSelect() {
 	}
 }
 
-// For sorting panels by Z coordinate
+// For sorting array of FileInfo by Name
 type listFileInfo []os.FileInfo
 
 func (fi listFileInfo) Len() int      { return len(fi) }

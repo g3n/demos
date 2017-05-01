@@ -5,18 +5,23 @@
 package main
 
 import (
+	"fmt"
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/camera/control"
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/graphic"
-	"github.com/g3n/engine/light"
-	"github.com/g3n/engine/util/logger"
-	//"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/gui"
+	"github.com/g3n/engine/light"
+	"github.com/g3n/engine/loader/collada"
+	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
+	"github.com/g3n/engine/util/logger"
 	"github.com/g3n/engine/window"
+	"io"
+	"os"
+	"path/filepath"
 	"runtime"
 )
 
@@ -32,6 +37,7 @@ type Context struct {
 	tb       *toolBar
 	axis     *graphic.AxisHelper
 	grid     *graphic.GridHelper
+	models   []*core.Node
 }
 
 var log *logger.Logger
@@ -196,7 +202,10 @@ func NewToolbar(ctx *Context) *toolBar {
 	// Create "File" menu and adds it to the menu bar
 	m1 := gui.NewMenu()
 	m1.AddOption("Open model").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		tb.openModel()
+		tb.fs.SetVisible(true)
+	})
+	m1.AddOption("Clear scene").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
+		clearScene(ctx)
 	})
 	m1.AddSeparator()
 	m1.AddOption("Quit").SetId("quit").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
@@ -235,20 +244,26 @@ func NewToolbar(ctx *Context) *toolBar {
 	tb.fs = NewFileSelect(400, 300)
 	tb.fs.SetVisible(false)
 	tb.fs.Subscribe("OnOK", func(evname string, ev interface{}) {
-		log.Debug("OnOK:%s", tb.fs.Selected())
+		fpath := tb.fs.Selected()
+		if fpath == "" {
+			tb.ed.Show("File not selected")
+			return
+		}
+		err := openModel(tb.ctx, fpath)
+		if err != nil {
+			tb.ed.Show(err.Error())
+			return
+		}
 		tb.fs.SetVisible(false)
 
 	})
 	tb.fs.Subscribe("OnCancel", func(evname string, ev interface{}) {
-		log.Debug("OnCancel")
 		tb.fs.SetVisible(false)
 	})
-	//tb.fs.SetPath("/")
 	tb.ctx.root.Add(tb.fs)
 
 	// Creates error dialog
 	tb.ed = NewErrorDialog(440, 100)
-	tb.ed.Show("Error message is written here")
 	tb.ctx.root.Add(tb.ed)
 
 	return tb
@@ -275,10 +290,66 @@ func (tb *toolBar) onResize() {
 	tb.ed.SetPosition(px, py)
 }
 
-func (tb *toolBar) openModel() {
+func openModel(ctx *Context, fpath string) error {
 
-	log.Debug("openModel not implemented yet")
-	tb.fs.SetVisible(true)
+	dir, file := filepath.Split(fpath)
+	ext := filepath.Ext(file)
+	log.Debug("ext:%s", ext)
+
+	// Loads OBJ model
+	if ext == ".obj" {
+		// Checks for material file in the same dir
+		matfile := file[:len(file)-len(ext)]
+		matpath := filepath.Join(dir, matfile)
+		log.Debug("matpath:%s", matpath)
+		_, err := os.Stat(matpath)
+		if err != nil {
+			matpath = ""
+		}
+
+		// Decodes model in in OBJ format
+		dec, err := obj.Decode(fpath, matpath)
+		if err != nil {
+			return err
+		}
+
+		// Creates a new node with all the objects in the decoded file and adds it to the scene
+		group, err := dec.NewGroup()
+		if err != nil {
+			return err
+		}
+		ctx.scene.Add(group)
+		ctx.models = append(ctx.models, group)
+		return nil
+	}
+
+	// Loads COLLADA model
+	if ext == ".dae" {
+		dec, err := collada.Decode(fpath)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		dec.SetDirImages(dir)
+
+		// Loads collada scene
+		s, err := dec.NewScene()
+		if err != nil {
+			return err
+		}
+		ctx.scene.Add(s)
+		ctx.models = append(ctx.models, s.GetNode())
+		return nil
+	}
+	return fmt.Errorf("Unrecognized model file extension:[%s]", ext)
+}
+
+func clearScene(ctx *Context) {
+
+	for i := 0; i < len(ctx.models); i++ {
+		model := ctx.models[i]
+		ctx.scene.Remove(model)
+		model.Dispose()
+	}
 }
 
 func buildGui(ctx *Context) {
