@@ -34,6 +34,8 @@ type Context struct {
 	ambLight *light.Ambient
 	dirLight *light.Directional
 	cam      *camera.Perspective
+	camPos   math32.Vector3
+	oc       *control.OrbitControl
 	root     *gui.Root
 	axis     *graphic.AxisHelper
 	grid     *graphic.GridHelper
@@ -105,8 +107,9 @@ func main() {
 	ctx.cam = camera.NewPerspective(65, aspect, 0.01, 1000)
 
 	// Creates orbit camera control and position the camera
-	_ = control.NewOrbitControl(ctx.cam, ctx.win)
-	ctx.cam.SetPosition(8.3, 4.7, 3.7)
+	ctx.oc = control.NewOrbitControl(ctx.cam, ctx.win)
+	ctx.camPos = math32.Vector3{8.3, 4.7, 3.7}
+	ctx.cam.SetPositionVec(&ctx.camPos)
 
 	// Subscribe to window resize events
 	win.Subscribe(window.OnWindowSize, func(evname string, ev interface{}) {
@@ -175,6 +178,7 @@ func onWinResize(ctx *Context) {
 	ctx.root.SetSize(float32(width), float32(height))
 }
 
+// guiState contains all gui elements and states
 type guiState struct {
 	ctx      *Context
 	mb       *gui.Menu
@@ -207,12 +211,17 @@ func setupGui(ctx *Context) *guiState {
 	m1.AddOption("Clear scene").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
 		clearScene(ctx)
 	})
+	m1.AddOption("Reset camera").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
+		ctx.cam.SetPositionVec(&ctx.camPos)
+		ctx.cam.LookAt(&math32.Vector3{0, 0, 0})
+	})
 	m1.AddSeparator()
 	m1.AddOption("Quit").SetId("quit").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
 		ui.ctx.win.SetShouldClose(true)
 	})
 	ui.mb.AddMenu("File", m1)
 
+	// Create "View" menu and adds it to the menu bar
 	m2 := gui.NewMenu()
 	vAxis := m2.AddOption("View axis helper").SetIcon(checkOFF)
 	vAxis.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
@@ -290,18 +299,17 @@ func (ui *guiState) onResize() {
 	ui.ed.SetPosition(px, py)
 }
 
+// openModel try to open the specified model and add it to the scene
 func openModel(ctx *Context, fpath string) error {
 
 	dir, file := filepath.Split(fpath)
 	ext := filepath.Ext(file)
-	log.Debug("ext:%s", ext)
 
 	// Loads OBJ model
 	if ext == ".obj" {
 		// Checks for material file in the same dir
 		matfile := file[:len(file)-len(ext)]
 		matpath := filepath.Join(dir, matfile)
-		log.Debug("matpath:%s", matpath)
 		_, err := os.Stat(matpath)
 		if err != nil {
 			matpath = ""
@@ -343,6 +351,7 @@ func openModel(ctx *Context, fpath string) error {
 	return fmt.Errorf("Unrecognized model file extension:[%s]", ext)
 }
 
+// clearScene removes and disposes of all loaded models in the scene
 func clearScene(ctx *Context) {
 
 	for i := 0; i < len(ctx.models); i++ {
