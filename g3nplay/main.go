@@ -49,7 +49,7 @@ func main() {
 	total := player.TotalTime()
 	fmt.Printf("Playing:[%s] (%3.1f seconds)\n", fpath, total)
 
-	// Stars player and waits for it to stop
+	// Starts player and waits for it to stop
 	player.Play()
 	for {
 		if player.State() == al.Stopped {
