@@ -64,7 +64,7 @@ func main() {
 
 	// Creates a wireframe sphere positioned at the center of the scene
 	geom := geometry.NewSphere(2, 16, 16, 0, math.Pi*2, 0, math.Pi)
-	mat := material.NewStandard(math32.NewColor(1, 1, 1))
+	mat := material.NewStandard(math32.NewColor("White"))
 	mat.SetSide(material.SideDouble)
 	mat.SetWireframe(true)
 	sphere := graphic.NewMesh(geom, mat)
