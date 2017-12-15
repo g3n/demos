@@ -13,7 +13,7 @@ import (
 	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
-	"github.com/g3n/engine/gui/assets"
+	"github.com/g3n/engine/gui/assets/icon"
 	"github.com/g3n/engine/light"
 	"github.com/g3n/engine/loader/collada"
 	"github.com/g3n/engine/loader/obj"
@@ -45,8 +45,8 @@ type Context struct {
 }
 
 const (
-	checkON  = assets.CheckBox
-	checkOFF = assets.CheckBoxOutlineBlank
+	checkON  = icon.CheckBox
+	checkOFF = icon.CheckBoxOutlineBlank
 )
 
 // Package logger
@@ -291,7 +291,7 @@ func setupGui(ctx *Context) *guiState {
 	ui.ctx.root.Add(ui.fs)
 
 	// Creates error dialog
-	ui.ed = NewErrorDialog(440, 100)
+	ui.ed = NewErrorDialog(800, 100)
 	ui.ctx.root.Add(ui.ed)
 
 	return ui

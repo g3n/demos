@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/g3n/engine/gui"
-	"github.com/g3n/engine/gui/assets"
+	"github.com/g3n/engine/gui/assets/icon"
 	"github.com/g3n/engine/math32"
 	"os"
 	"path/filepath"
@@ -23,7 +23,7 @@ func NewFileSelect(width, height float32) *FileSelect {
 	fs.Panel.Initialize(width, height)
 	fs.SetBorders(2, 2, 2, 2)
 	fs.SetPaddings(4, 4, 4, 4)
-	fs.SetColor(&math32.White)
+	fs.SetColor(math32.NewColor("White"))
 	fs.SetVisible(false)
 
 	// Set vertical box layout for the whole panel
@@ -102,15 +102,15 @@ func (fs *FileSelect) SetPath(path string) error {
 	fs.list.Clear()
 	// Adds previous directory
 	prev := gui.NewImageLabel("..")
-	prev.SetIcon(assets.FolderOpen)
+	prev.SetIcon(icon.FolderOpen)
 	fs.list.Add(prev)
 	// Adds directory files
 	for i := 0; i < len(files); i++ {
 		item := gui.NewImageLabel(files[i].Name())
 		if files[i].IsDir() {
-			item.SetIcon(assets.FolderOpen)
+			item.SetIcon(icon.FolderOpen)
 		} else {
-			item.SetIcon(assets.InsertPhoto)
+			item.SetIcon(icon.InsertPhoto)
 		}
 		fs.list.Add(item)
 	}
