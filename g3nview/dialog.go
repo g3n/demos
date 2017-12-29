@@ -15,10 +15,11 @@ func NewErrorDialog(width, height float32) *ErrorDialog {
 
 	e := new(ErrorDialog)
 	e.Initialize(width, height)
-	e.SetVisible(false)
 	e.SetBorders(2, 2, 2, 2)
 	e.SetPaddings(4, 4, 4, 4)
 	e.SetColor(math32.NewColor("White"))
+	e.SetVisible(false)
+	e.SetBounded(false)
 
 	// Set vertical box layout for the whole panel
 	l := gui.NewVBoxLayout()
@@ -46,4 +47,8 @@ func (e *ErrorDialog) Show(msg string) {
 
 	e.msg.SetText(msg)
 	e.SetVisible(true)
+	parent := e.Parent().(gui.IPanel).GetPanel()
+	px := (parent.Width() - e.Width()) / 2
+	py := (parent.Height() - e.Height()) / 2
+	e.SetPosition(px, py)
 }

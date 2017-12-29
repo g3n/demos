@@ -7,10 +7,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+
 	"github.com/g3n/engine/camera"
-	"github.com/g3n/engine/camera/control"
 	"github.com/g3n/engine/core"
-	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/gui/assets/icon"
@@ -18,30 +20,20 @@ import (
 	"github.com/g3n/engine/loader/collada"
 	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/math32"
-	"github.com/g3n/engine/renderer"
+	"github.com/g3n/engine/util/app"
 	"github.com/g3n/engine/util/logger"
-	"github.com/g3n/engine/window"
-	"io"
-	"os"
-	"path/filepath"
-	"runtime"
 )
 
-// Application context
-type Context struct {
-	win      window.IWindow
-	gs       *gls.GLS
-	scene    *core.Node
-	ambLight *light.Ambient
-	dirLight *light.Directional
-	cam      *camera.Perspective
-	camPos   math32.Vector3
-	oc       *control.OrbitControl
-	root     *gui.Root
-	axis     *graphic.AxisHelper
-	grid     *graphic.GridHelper
-	models   []*core.Node
-	ui       *guiState
+type g3nView struct {
+	*app.App                     // Embedded application object
+	fs       *FileSelect         // File selection dialog
+	ed       *ErrorDialog        // Error dialog
+	axis     *graphic.AxisHelper // Axis helper
+	grid     *graphic.GridHelper // Grid helper
+	viewAxis bool                // Axis helper visible flag
+	viewGrid bool                // Grid helper visible flag
+	camPos   math32.Vector3      // Initial camera position
+	models   []*core.Node        // Models being shown
 }
 
 const (
@@ -49,279 +41,155 @@ const (
 	checkOFF = icon.CheckBoxOutlineBlank
 )
 
-// Package logger
-var log *logger.Logger
-
 func main() {
 
 	// Parse command line parameters
 	flag.Usage = usage
 	flag.Parse()
 
-	// Creates window and OpenGL context
-	win, err := window.New("glfw", 800, 600, "Viewer", false)
+	// Creates G3N application
+	gv := new(g3nView)
+	a, err := app.Create("g3nview", app.Options{
+		VersionMajor: 0,
+		VersionMinor: 1,
+		WinWidth:     800,
+		WinHeight:    600,
+		LogLevel:     logger.DEBUG,
+	})
 	if err != nil {
 		panic(err)
 	}
-
-	// Creates independent logger for the application
-	log = logger.New("G3NVIEW", nil)
-	log.AddWriter(logger.NewConsole(false))
-	log.SetFormat(logger.FTIME | logger.FMICROS)
-	log.SetLevel(logger.DEBUG)
-
-	// Starts building app context
-	ctx := new(Context)
-	ctx.win = win
-
-	// OpenGL functions must be executed in the same thread where
-	// the context was created (by window.New())
-	runtime.LockOSThread()
-
-	// Create OpenGL state
-	gs, err := gls.New()
-	if err != nil {
-		panic(err)
-	}
-	ctx.gs = gs
-
-	// Sets the initial OpenGL viewport size the same as the window size
-	// This will be updated when the window is resized
-	width, height := win.GetSize()
-	gs.Viewport(0, 0, int32(width), int32(height))
-
-	// Creates scene for 3D objects
-	ctx.scene = core.NewNode()
-
-	// Creates root panel for GUI and sets the GUI
-	ctx.root = gui.NewRoot(gs, win)
-	setupGui(ctx)
-
-	// Adds white ambient light to the scene
-	ctx.ambLight = light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.5)
-	ctx.scene.Add(ctx.ambLight)
+	gv.App = a
 
 	// Add directional white light from right
-	ctx.dirLight = light.NewDirectional(&math32.Color{1, 1, 1}, 1.0)
-	ctx.dirLight.SetPosition(1, 0, 0)
-	ctx.scene.Add(ctx.dirLight)
-
-	// Adds a perspective camera to the scene
-	// The camera aspect ratio will be updated when the window is resized.
-	aspect := float32(width) / float32(height)
-	ctx.cam = camera.NewPerspective(65, aspect, 0.01, 1000)
-
-	// Creates orbit camera control and position the camera
-	ctx.oc = control.NewOrbitControl(ctx.cam, ctx.win)
-	ctx.camPos = math32.Vector3{8.3, 4.7, 3.7}
-	ctx.cam.SetPositionVec(&ctx.camPos)
+	dirLight := light.NewDirectional(math32.NewColor("white"), 1.0)
+	dirLight.SetPosition(1, 0, 0)
+	gv.Scene().Add(dirLight)
 
 	// Add an axis helper to the scene initially not visible
-	ctx.axis = graphic.NewAxisHelper(2)
-	ctx.axis.SetVisible(false)
-	ctx.scene.Add(ctx.axis)
+	gv.axis = graphic.NewAxisHelper(2)
+	gv.viewAxis = true
+	gv.axis.SetVisible(gv.viewAxis)
+	gv.Scene().Add(gv.axis)
 
 	// Adds a grid helper to the scene initially not visible
-	ctx.grid = graphic.NewGridHelper(50, 1, &math32.Color{0.4, 0.4, 0.4})
-	ctx.grid.SetVisible(false)
-	ctx.scene.Add(ctx.grid)
+	gv.grid = graphic.NewGridHelper(50, 1, &math32.Color{0.4, 0.4, 0.4})
+	gv.viewGrid = true
+	gv.grid.SetVisible(gv.viewGrid)
+	gv.Scene().Add(gv.grid)
 
-	// Creates a renderer and adds default shaders
-	rend := renderer.NewRenderer(gs)
-	err = rend.AddDefaultShaders()
-	if err != nil {
-		panic(err)
-	}
+	// Sets the initial camera position
+	gv.camPos = math32.Vector3{8.3, 4.7, 3.7}
+	gv.Camera().(*camera.Perspective).SetPositionVec(&gv.camPos)
 
-	// Subscribe to window resize events
-	win.Subscribe(window.OnWindowSize, func(evname string, ev interface{}) {
-		onWinResize(ctx)
-	})
-	onWinResize(ctx)
-
-	// Sets window background color
-	gs.ClearColor(0.6, 0.6, 0.6, 1.0)
+	// Build the user interface
+	gv.buildGui()
 
 	// Try to load models specified in the command line
 	for _, m := range flag.Args() {
-		log.Debug("m:%v", m)
-		err = openModel(ctx, m)
+		err = gv.openModel(m)
 		if err != nil {
-			log.Error("%s", err)
+			gv.Log().Error("%s", err)
+			return
 		}
 	}
 
-	// Render loop
-	for !win.ShouldClose() {
-
-		// Clear buffers
-		gs.Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
-
-		// Render the scene using the specified camera
-		err := rend.Render(ctx.scene, ctx.cam)
-		if err != nil {
-			log.Fatal("Render error: %s\n", err)
-		}
-
-		// Render GUI over everything
-		gs.Clear(gls.DEPTH_BUFFER_BIT)
-		err = rend.Render(ctx.root, ctx.cam)
-		if err != nil {
-			log.Fatal("Render error: %s\n", err)
-		}
-
-		// Update window and checks for I/O events
-		win.SwapBuffers()
-		win.PollEvents()
-	}
+	// Run application main render loop
+	gv.Run()
 }
 
-// usage shows the application usage
-func usage() {
+// setupGui builds the GUI
+func (gv *g3nView) buildGui() error {
 
-	fmt.Fprintf(os.Stderr, "usage: g3nview [model1 model2   modelN]\n")
-	flag.PrintDefaults()
-	os.Exit(2)
-}
+	// Sets the layout of the main gui root panel
+	gv.Gui().SetLayout(gui.NewVBoxLayout())
 
-// winResizeEvent is called when the window resize event is received
-func onWinResize(ctx *Context) {
-
-	// Sets view port
-	width, height := ctx.win.GetSize()
-	ctx.gs.Viewport(0, 0, int32(width), int32(height))
-
-	// Sets camera aspect ratio
-	aspect := float32(width) / float32(height)
-	ctx.cam.SetAspect(aspect)
-
-	// Sets GUI root panel size
-	ctx.root.SetSize(float32(width), float32(height))
-}
-
-// guiState contains all gui elements and states
-type guiState struct {
-	ctx      *Context
-	mb       *gui.Menu
-	fs       *FileSelect
-	ed       *ErrorDialog
-	viewAxis bool
-	viewGrid bool
-}
-
-// setupGui builds the gui
-func setupGui(ctx *Context) *guiState {
-
-	ui := new(guiState)
-	ui.ctx = ctx
-	ctx.ui = ui
-
-	// Create menu bar and adds it to the toolbar
-	ui.mb = gui.NewMenuBar()
-	ui.mb.SetLayoutParams(&gui.HBoxLayoutParams{Expand: 0, AlignV: gui.AlignCenter})
-	ui.ctx.root.Add(ui.mb)
-	ctx.root.Subscribe(gui.OnResize, func(evname string, ev interface{}) {
-		ui.onResize()
-	})
+	// Adds menu bar
+	mb := gui.NewMenuBar()
+	mb.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 0, AlignH: gui.AlignWidth})
+	gv.Gui().Add(mb)
 
 	// Create "File" menu and adds it to the menu bar
 	m1 := gui.NewMenu()
 	m1.AddOption("Open model").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		ui.fs.SetVisible(true)
+		gv.fs.Show(true)
 	})
 	m1.AddOption("Remove models").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		removeModels(ctx)
+		gv.removeModels()
 	})
 	m1.AddOption("Reset camera").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		ctx.cam.SetPositionVec(&ctx.camPos)
-		ctx.cam.LookAt(&math32.Vector3{0, 0, 0})
+		cam := gv.Camera().(*camera.Perspective)
+		cam.SetPositionVec(&gv.camPos)
+		cam.LookAt(&math32.Vector3{0, 0, 0})
 	})
 	m1.AddSeparator()
 	m1.AddOption("Quit").SetId("quit").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		ui.ctx.win.SetShouldClose(true)
+		gv.Quit()
 	})
-	ui.mb.AddMenu("File", m1)
+	mb.AddMenu("File", m1)
 
 	// Create "View" menu and adds it to the menu bar
 	m2 := gui.NewMenu()
 	vAxis := m2.AddOption("View axis helper").SetIcon(checkOFF)
+	vAxis.SetIcon(getIcon(gv.viewAxis))
 	vAxis.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		if ui.viewAxis {
-			vAxis.SetIcon(checkOFF)
-			ui.viewAxis = false
-		} else {
-			vAxis.SetIcon(checkON)
-			ui.viewAxis = true
-		}
-		ctx.axis.SetVisible(ui.viewAxis)
+		gv.viewAxis = !gv.viewAxis
+		vAxis.SetIcon(getIcon(gv.viewAxis))
+		gv.axis.SetVisible(gv.viewAxis)
 	})
+
 	vGrid := m2.AddOption("View grid helper").SetIcon(checkOFF)
+	vGrid.SetIcon(getIcon(gv.viewGrid))
 	vGrid.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		if ui.viewGrid {
-			vGrid.SetIcon(checkOFF)
-			ui.viewGrid = false
-		} else {
-			vGrid.SetIcon(checkON)
-			ui.viewGrid = true
-		}
-		ctx.grid.SetVisible(ui.viewGrid)
+		gv.viewGrid = !gv.viewGrid
+		vGrid.SetIcon(getIcon(gv.viewGrid))
+		gv.grid.SetVisible(gv.viewGrid)
 	})
-	ui.mb.AddMenu("View", m2)
+	mb.AddMenu("View", m2)
 
-	// Creates file select
-	ui.fs = NewFileSelect(400, 300)
-	ui.fs.SetVisible(false)
-	ui.fs.Subscribe("OnOK", func(evname string, ev interface{}) {
-		fpath := ui.fs.Selected()
+	// Creates file selection dialog
+	fs, err := NewFileSelect(400, 300)
+	if err != nil {
+		return err
+	}
+	gv.fs = fs
+	gv.fs.SetVisible(false)
+	gv.fs.Subscribe("OnOK", func(evname string, ev interface{}) {
+		fpath := gv.fs.Selected()
 		if fpath == "" {
-			ui.ed.Show("File not selected")
+			gv.ed.Show("File not selected")
 			return
 		}
-		err := openModel(ui.ctx, fpath)
+		err := gv.openModel(fpath)
 		if err != nil {
-			ui.ed.Show(err.Error())
+			gv.ed.Show(err.Error())
 			return
 		}
-		ui.fs.SetVisible(false)
+		gv.fs.SetVisible(false)
 
 	})
-	ui.fs.Subscribe("OnCancel", func(evname string, ev interface{}) {
-		ui.fs.SetVisible(false)
+	gv.fs.Subscribe("OnCancel", func(evname string, ev interface{}) {
+		gv.fs.Show(false)
 	})
-	ui.ctx.root.Add(ui.fs)
+	gv.Gui().Add(gv.fs)
 
 	// Creates error dialog
-	ui.ed = NewErrorDialog(800, 100)
-	ui.ctx.root.Add(ui.ed)
+	gv.ed = NewErrorDialog(800, 100)
+	gv.Gui().Add(gv.ed)
 
-	return ui
-}
+	// Sets panel for 3D area
+	panel3D := gui.NewPanel(0, 0)
+	panel3D.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 1, AlignH: gui.AlignWidth})
+	//panel3D.SetColor(math32.NewColor("gray"))
+	panel3D.SetRenderable(false)
+	gv.Gui().Add(panel3D)
+	gv.Renderer().SetGuiPanel3D(panel3D)
 
-// onResize is called when the root panel is resized and sets
-// the size and position of the gui elements
-func (ui *guiState) onResize() {
-
-	// Sets menu width
-	width, height := ui.ctx.win.GetSize()
-	ui.mb.SetWidth(float32(width))
-
-	// Center file select
-	w := ui.fs.Width()
-	h := ui.fs.Height()
-	px := (float32(width) - w) / 2
-	py := (float32(height) - h) / 2
-	ui.fs.SetPosition(px, py)
-
-	// Center error dialog
-	w = ui.ed.Width()
-	h = ui.ed.Height()
-	px = (float32(width) - w) / 2
-	py = (float32(height) - h) / 2
-	ui.ed.SetPosition(px, py)
+	return nil
 }
 
 // openModel try to open the specified model and add it to the scene
-func openModel(ctx *Context, fpath string) error {
+func (gv *g3nView) openModel(fpath string) error {
 
 	dir, file := filepath.Split(fpath)
 	ext := filepath.Ext(file)
@@ -347,8 +215,8 @@ func openModel(ctx *Context, fpath string) error {
 		if err != nil {
 			return err
 		}
-		ctx.scene.Add(group)
-		ctx.models = append(ctx.models, group)
+		gv.Scene().Add(group)
+		gv.models = append(gv.models, group)
 		return nil
 	}
 
@@ -365,19 +233,36 @@ func openModel(ctx *Context, fpath string) error {
 		if err != nil {
 			return err
 		}
-		ctx.scene.Add(s)
-		ctx.models = append(ctx.models, s.GetNode())
+		gv.Scene().Add(s)
+		gv.models = append(gv.models, s.GetNode())
 		return nil
 	}
 	return fmt.Errorf("Unrecognized model file extension:[%s]", ext)
 }
 
 // removeModels removes and disposes of all loaded models in the scene
-func removeModels(ctx *Context) {
+func (gv *g3nView) removeModels() {
 
-	for i := 0; i < len(ctx.models); i++ {
-		model := ctx.models[i]
-		ctx.scene.Remove(model)
+	for i := 0; i < len(gv.models); i++ {
+		model := gv.models[i]
+		gv.Scene().Remove(model)
 		model.Dispose()
 	}
+}
+
+func getIcon(state bool) string {
+
+	if state {
+		return checkON
+	} else {
+		return checkOFF
+	}
+}
+
+// usage shows the application usage
+func usage() {
+
+	fmt.Fprintf(os.Stderr, "usage: g3nview [model1 model2   modelN]\n")
+	flag.PrintDefaults()
+	os.Exit(2)
 }

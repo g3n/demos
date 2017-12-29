@@ -17,7 +17,7 @@ type FileSelect struct {
 	bcan *gui.Button
 }
 
-func NewFileSelect(width, height float32) *FileSelect {
+func NewFileSelect(width, height float32) (*FileSelect, error) {
 
 	fs := new(FileSelect)
 	fs.Panel.Initialize(width, height)
@@ -25,6 +25,7 @@ func NewFileSelect(width, height float32) *FileSelect {
 	fs.SetPaddings(4, 4, 4, 4)
 	fs.SetColor(math32.NewColor("White"))
 	fs.SetVisible(false)
+	fs.SetBounded(false)
 
 	// Set vertical box layout for the whole panel
 	l := gui.NewVBoxLayout()
@@ -70,11 +71,25 @@ func NewFileSelect(width, height float32) *FileSelect {
 	// Sets initial directory
 	path, err := os.Getwd()
 	if err != nil {
-		log.Error("%s", err)
+		return nil, err
 	} else {
 		fs.SetPath(path)
 	}
-	return fs
+	return fs, nil
+}
+
+// Show shows or hide the file selection dialog
+func (fs *FileSelect) Show(show bool) {
+
+	if show {
+		fs.SetVisible(true)
+		parent := fs.Parent().(gui.IPanel).GetPanel()
+		px := (parent.Width() - fs.Width()) / 2
+		py := (parent.Height() - fs.Height()) / 2
+		fs.SetPosition(px, py)
+	} else {
+		fs.SetVisible(false)
+	}
 }
 
 func (fs *FileSelect) SetPath(path string) error {
@@ -82,7 +97,6 @@ func (fs *FileSelect) SetPath(path string) error {
 	// Open path file or dir
 	f, err := os.Open(path)
 	if err != nil {
-		log.Error("%s", err)
 		return err
 	}
 	defer f.Close()
@@ -90,7 +104,6 @@ func (fs *FileSelect) SetPath(path string) error {
 	// Checks if it is a directory
 	files, err := f.Readdir(0)
 	if err != nil {
-		log.Error("%s", err)
 		return err
 	}
 	fs.path.SetText(path)
@@ -146,7 +159,7 @@ func (fs *FileSelect) onSelect() {
 	path := filepath.Join(fs.path.Text(), text)
 	s, err := os.Stat(path)
 	if err != nil {
-		log.Error("%s", err)
+		panic(err)
 		return
 	}
 	if s.IsDir() {
