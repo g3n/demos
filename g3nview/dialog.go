@@ -28,7 +28,6 @@ func NewErrorDialog(width, height float32) *ErrorDialog {
 
 	// Creates error message label
 	e.msg = gui.NewImageLabel("")
-	e.msg.SetFontSize(18)
 	e.msg.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 2, AlignH: gui.AlignWidth})
 	e.Add(e.msg)
 

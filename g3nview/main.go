@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
@@ -20,20 +19,20 @@ import (
 	"github.com/g3n/engine/loader/collada"
 	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/math32"
-	"github.com/g3n/engine/util/app"
+	"github.com/g3n/engine/util/application"
 	"github.com/g3n/engine/util/logger"
 )
 
 type g3nView struct {
-	*app.App                     // Embedded application object
-	fs       *FileSelect         // File selection dialog
-	ed       *ErrorDialog        // Error dialog
-	axis     *graphic.AxisHelper // Axis helper
-	grid     *graphic.GridHelper // Grid helper
-	viewAxis bool                // Axis helper visible flag
-	viewGrid bool                // Grid helper visible flag
-	camPos   math32.Vector3      // Initial camera position
-	models   []*core.Node        // Models being shown
+	*application.Application                     // Embedded application object
+	fs                       *FileSelect         // File selection dialog
+	ed                       *ErrorDialog        // Error dialog
+	axis                     *graphic.AxisHelper // Axis helper
+	grid                     *graphic.GridHelper // Grid helper
+	viewAxis                 bool                // Axis helper visible flag
+	viewGrid                 bool                // Grid helper visible flag
+	camPos                   math32.Vector3      // Initial camera position
+	models                   []*core.Node        // Models being shown
 }
 
 const (
@@ -49,17 +48,19 @@ func main() {
 
 	// Creates G3N application
 	gv := new(g3nView)
-	a, err := app.Create("g3nview", app.Options{
-		VersionMajor: 0,
-		VersionMinor: 1,
-		WinWidth:     800,
-		WinHeight:    600,
-		LogLevel:     logger.DEBUG,
+	a, err := application.Create("g3nview", application.Options{
+		Width:    800,
+		Height:   600,
+		LogLevel: logger.DEBUG,
 	})
 	if err != nil {
 		panic(err)
 	}
-	gv.App = a
+	gv.Application = a
+
+	// Adds ambient light
+	ambLight := light.NewAmbient(math32.NewColor("white"), 0.5)
+	gv.Scene().Add(ambLight)
 
 	// Add directional white light from right
 	dirLight := light.NewDirectional(math32.NewColor("white"), 1.0)
@@ -80,7 +81,7 @@ func main() {
 
 	// Sets the initial camera position
 	gv.camPos = math32.Vector3{8.3, 4.7, 3.7}
-	gv.Camera().(*camera.Perspective).SetPositionVec(&gv.camPos)
+	gv.CameraPersp().SetPositionVec(&gv.camPos)
 
 	// Build the user interface
 	gv.buildGui()
@@ -118,7 +119,7 @@ func (gv *g3nView) buildGui() error {
 		gv.removeModels()
 	})
 	m1.AddOption("Reset camera").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		cam := gv.Camera().(*camera.Perspective)
+		cam := gv.CameraPersp()
 		cam.SetPositionVec(&gv.camPos)
 		cam.LookAt(&math32.Vector3{0, 0, 0})
 	})
@@ -174,14 +175,14 @@ func (gv *g3nView) buildGui() error {
 	gv.Gui().Add(gv.fs)
 
 	// Creates error dialog
-	gv.ed = NewErrorDialog(800, 100)
+	gv.ed = NewErrorDialog(600, 100)
 	gv.Gui().Add(gv.ed)
 
 	// Sets panel for 3D area
 	panel3D := gui.NewPanel(0, 0)
 	panel3D.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 1, AlignH: gui.AlignWidth})
-	//panel3D.SetColor(math32.NewColor("gray"))
 	panel3D.SetRenderable(false)
+	panel3D.SetColor(math32.NewColor("gray"))
 	gv.Gui().Add(panel3D)
 	gv.Renderer().SetGuiPanel3D(panel3D)
 
