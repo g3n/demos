@@ -76,6 +76,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	rend.SetScene(scene)
 
 	// Sets window background color
 	gs.ClearColor(0, 0, 0, 1.0)
@@ -90,7 +91,7 @@ func main() {
 		sphere.AddRotationY(0.005)
 
 		// Render the scene using the specified camera
-		rend.Render(scene, camera)
+		rend.Render(camera)
 
 		// Update window and checks for I/O events
 		win.SwapBuffers()

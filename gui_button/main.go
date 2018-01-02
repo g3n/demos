@@ -6,12 +6,14 @@ package main
 
 import (
 	"fmt"
+	"runtime"
+
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/gui"
+	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
 	"github.com/g3n/engine/window"
-	"runtime"
 )
 
 func main() {
@@ -32,8 +34,9 @@ func main() {
 		panic(err)
 	}
 
-	// Creates GUI root panel
+	// Creates GUI root panel and sets the background color
 	root := gui.NewRoot(gs, win)
+	root.SetColor(math32.NewColor("darkgray"))
 
 	// Initial setting of the viewport and root panel size
 	width, height := win.GetSize()
@@ -92,6 +95,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	rend.SetGui(root)
 
 	// Sets window background color
 	gs.ClearColor(0.6, 0.6, 0.6, 1.0)
@@ -99,14 +103,16 @@ func main() {
 	// Render loop
 	for !win.ShouldClose() {
 
-		// Clear buffers
-		gs.Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
-
 		// Render the root GUI panel using the specified camera
-		rend.Render(root, camera)
+		rendered, err := rend.Render(camera)
+		if err != nil {
+			panic(err)
+		}
+		win.PollEvents()
 
 		// Update window and checks for I/O events
-		win.SwapBuffers()
-		win.PollEvents()
+		if rendered {
+			win.SwapBuffers()
+		}
 	}
 }

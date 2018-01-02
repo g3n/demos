@@ -100,6 +100,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	rend.SetScene(scene)
 
 	// Sets window background color
 	gs.ClearColor(0.6, 0.6, 0.6, 1.0)
@@ -111,7 +112,7 @@ func main() {
 		gs.Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
 
 		// Render the scene using the specified camera
-		rend.Render(scene, camera)
+		rend.Render(camera)
 
 		// Update window and checks for I/O events
 		win.SwapBuffers()
