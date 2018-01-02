@@ -84,9 +84,6 @@ func main() {
 	// Render loop
 	for !win.ShouldClose() {
 
-		// Clear buffers
-		gs.Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
-
 		// Rotates the sphere a bit around the Z axis (up)
 		sphere.AddRotationY(0.005)
 
