@@ -19,7 +19,11 @@ import (
 func main() {
 
 	// Creates window and OpenGL context
-	win, err := window.New("glfw", 800, 600, "GUI Button", false)
+	wmgr, err := window.Manager("glfw")
+	if err != nil {
+		panic(err)
+	}
+	win, err := wmgr.CreateWindow(800, 600, "GUI Button", false)
 	if err != nil {
 		panic(err)
 	}
@@ -39,7 +43,7 @@ func main() {
 	root.SetColor(math32.NewColor("darkgray"))
 
 	// Initial setting of the viewport and root panel size
-	width, height := win.GetSize()
+	width, height := win.Size()
 	gs.Viewport(0, 0, int32(width), int32(height))
 	root.SetSize(float32(width), float32(height))
 
@@ -52,7 +56,7 @@ func main() {
 	// - Update the root panel size
 	// - Update the camera aspect ratio
 	win.Subscribe(window.OnWindowSize, func(evname string, ev interface{}) {
-		width, height := win.GetSize()
+		width, height := win.Size()
 		gs.Viewport(0, 0, int32(width), int32(height))
 		root.SetSize(float32(width), float32(height))
 		aspect := float32(width) / float32(height)
@@ -108,7 +112,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
-		win.PollEvents()
+		wmgr.PollEvents()
 
 		// Update window and checks for I/O events
 		if rendered {

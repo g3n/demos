@@ -26,7 +26,11 @@ import (
 func main() {
 
 	// Creates window and OpenGL context
-	win, err := window.New("glfw", 800, 600, "Gopher3D", false)
+	wmgr, err := window.Manager("glfw")
+	if err != nil {
+		panic(err)
+	}
+	win, err := wmgr.CreateWindow(800, 600, "Gopher3D", false)
 	if err != nil {
 		panic(err)
 	}
@@ -43,7 +47,7 @@ func main() {
 
 	// Sets the initial OpenGL viewport size the same as the window size
 	// This will be updated when the window is resized
-	width, height := win.GetSize()
+	width, height := win.Size()
 	gs.Viewport(0, 0, int32(width), int32(height))
 
 	// Creates scene for 3D objects
@@ -70,7 +74,7 @@ func main() {
 	// Subscribe to window resize events
 	win.Subscribe(window.OnWindowSize, func(evname string, ev interface{}) {
 		// Updates viewport
-		width, height := win.GetSize()
+		width, height := win.Size()
 		gs.Viewport(0, 0, int32(width), int32(height))
 		// Updates camera aspect ratio
 		aspect := float32(width) / float32(height)
@@ -116,6 +120,6 @@ func main() {
 
 		// Update window and checks for I/O events
 		win.SwapBuffers()
-		win.PollEvents()
+		wmgr.PollEvents()
 	}
 }
