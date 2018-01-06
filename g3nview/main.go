@@ -44,14 +44,14 @@ func main() {
 
 	// Parse command line parameters
 	flag.Usage = usage
-	flag.Parse()
 
 	// Creates G3N application
 	gv := new(g3nView)
 	a, err := application.Create("g3nview", application.Options{
-		Width:    800,
-		Height:   600,
-		LogLevel: logger.DEBUG,
+		Width:       800,
+		Height:      600,
+		LogLevel:    logger.DEBUG,
+		EnableFlags: true,
 	})
 	if err != nil {
 		panic(err)
