@@ -13,7 +13,6 @@ import (
 
 	"github.com/g3n/engine/audio"
 	"github.com/g3n/engine/audio/al"
-	"github.com/g3n/engine/audio/ov"
 	"github.com/g3n/engine/audio/vorbis"
 )
 
@@ -31,8 +30,8 @@ func main() {
 	}
 	fpath := args[0]
 
-	// Try to open audio libraries
-	err := loadAudioLibs()
+	// Open default audio device
+	err := openAudio()
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -65,14 +64,8 @@ func usage() {
 	fmt.Fprintf(os.Stderr, "usage: g3nplay <soundfile>\n")
 }
 
-// loadAudioLibs try to load audio libraries
-func loadAudioLibs() error {
-
-	// Try to load OpenAL
-	err := al.Load()
-	if err != nil {
-		return err
-	}
+// openAudio opens the defaul audio device
+func openAudio() error {
 
 	// Opens default audio device
 	dev, err := al.OpenDevice("")
@@ -91,17 +84,9 @@ func loadAudioLibs() error {
 	if err != nil {
 		return fmt.Errorf("Error setting audio context current:%s", err)
 	}
-	fmt.Printf("%s version: %s\n", al.GetString(al.Vendor), al.GetString(al.Version))
 
-	// Try to load Ogg Vorbis support
-	err = ov.Load()
-	if err != nil {
-		return err
-	}
-	err = vorbis.Load()
-	if err != nil {
-		return err
-	}
+	// Logs library versions
+	fmt.Printf("%s version: %s\n", al.GetString(al.Vendor), al.GetString(al.Version))
 	fmt.Printf("%s\n", vorbis.VersionString())
 	return nil
 }
