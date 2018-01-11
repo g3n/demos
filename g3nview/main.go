@@ -47,9 +47,11 @@ func main() {
 
 	// Creates G3N application
 	gv := new(g3nView)
-	a, err := application.Create("g3nview", application.Options{
+	a, err := application.Create(application.Options{
+		Title:       "g3nview",
 		Width:       800,
 		Height:      600,
+		LogPrefix:   "g3nview",
 		LogLevel:    logger.DEBUG,
 		EnableFlags: true,
 	})
