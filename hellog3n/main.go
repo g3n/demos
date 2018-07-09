@@ -61,6 +61,7 @@ func main() {
 	aspect := float32(width) / float32(height)
 	camera := camera.NewPerspective(65, aspect, 0.01, 1000)
 	camera.SetPosition(0, 0, 5)
+	scene.Add(camera)
 
 	// Add an axis helper to the scene
 	axis := graphic.NewAxisHelper(2)
