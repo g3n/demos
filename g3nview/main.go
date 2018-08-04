@@ -84,6 +84,7 @@ func main() {
 	// Sets the initial camera position
 	gv.camPos = math32.Vector3{8.3, 4.7, 3.7}
 	gv.CameraPersp().SetPositionVec(&gv.camPos)
+	gv.CameraPersp().LookAt(&math32.Vector3{0,0,0})
 
 	// Build the user interface
 	gv.buildGui()
