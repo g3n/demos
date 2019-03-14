@@ -17,9 +17,18 @@ for the [G3N](https://github.com/g3n/engine) Go 3D Game Engine.
 
 ## Run
 
-The gopher3d demo requires artifacts from gopher3d directory:
+The gopher3d demo requires artifacts from `gopher3d` directory.
+
+Without Go Modules:
 
     cd ~/go/src/github.com/g3n/demos/gopher3d
+
+With Go Modules:
+
+    cd gopher3d
+
+Then run gopher3d:
+
     gopher3d
 
 You can run the other demos directly from any location:
