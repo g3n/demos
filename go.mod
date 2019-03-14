@@ -1,4 +1,4 @@
-module github.com/udhos/demos
+module github.com/g3n/demos
 
 go 1.12
 
