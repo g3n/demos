@@ -14,7 +14,7 @@ type ErrorDialog struct {
 func NewErrorDialog(width, height float32) *ErrorDialog {
 
 	e := new(ErrorDialog)
-	e.Initialize(width, height)
+	e.Initialize(e, width, height)
 	e.SetBorders(2, 2, 2, 2)
 	e.SetPaddings(4, 4, 4, 4)
 	e.SetColor(math32.NewColor("White"))

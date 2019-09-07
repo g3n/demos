@@ -1,125 +1,77 @@
-// Copyright 2016 The G3N Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// This is a minimum G3N application showing how to create a window
-// and load an external 3D model in OBJ format.
-// The gopher OBJ model was exported from the file "gopher.blend"
-// at https://github.com/golang-samples/gopher-3d
-// For more complete demos please see: https://github.com/g3n/g3nd
 package main
 
 import (
+	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/camera/control"
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/gls"
-	"github.com/g3n/engine/graphic"
+	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/light"
 	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
 	"github.com/g3n/engine/window"
-	"runtime"
+	"time"
 )
 
 func main() {
 
-	// Creates window and OpenGL context
-	wmgr, err := window.Manager("glfw")
-	if err != nil {
-		panic(err)
-	}
-	win, err := wmgr.CreateWindow(800, 600, "Gopher3D", false)
-	if err != nil {
-		panic(err)
-	}
-
-	// OpenGL functions must be executed in the same thread where
-	// the context was created (by window.New())
-	runtime.LockOSThread()
-
-	// Create OpenGL state
-	gs, err := gls.New()
-	if err != nil {
-		panic(err)
-	}
-
-	// Sets the initial OpenGL viewport size the same as the window size
-	// This will be updated when the window is resized
-	width, height := win.Size()
-	gs.Viewport(0, 0, int32(width), int32(height))
-
-	// Creates scene for 3D objects
+	// Create application and scene
+	a := app.App()
 	scene := core.NewNode()
 
-	// Adds white ambient light to the scene
-	ambLight := light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.5)
-	scene.Add(ambLight)
+	// Set the scene to be managed by the gui manager
+	gui.Manager().Set(scene)
 
-	// Add directional white light from right
-	dirLight := light.NewDirectional(&math32.Color{1, 1, 1}, 1.0)
-	dirLight.SetPosition(1, 0, 0)
-	scene.Add(dirLight)
+	// Create perspective camera
+	cam := camera.NewPerspective(65, 1, 0.01, 1000)
+	cam.SetPosition(0, 0, 3)
+	scene.Add(cam)
 
-	// Adds a perspective camera to the scene
-	// The camera aspect ratio will be updated when the window is resized.
-	aspect := float32(width) / float32(height)
-	camera := camera.NewPerspective(65, aspect, 0.01, 1000)
+	// Set up orbit control for the camera
+	control.NewOrbitControl(cam)
 
-	// Creates orbit camera control and position the camera
-	_ = control.NewOrbitControl(camera, win)
-	camera.SetPosition(8.3, 4.7, 3.7)
+	// Set up callback to update viewport and camera aspect ratio when the window is resized
+	onResize := func(evname string, ev interface{}) {
+		// Get framebuffer size and update viewport accordingly
+		width, height := a.GetSize()
+		a.Gls().Viewport(0, 0, int32(width), int32(height))
+		// Update the camera's aspect ratio
+		cam.SetAspect(float32(width) / float32(height))
+	}
+	a.Subscribe(window.OnWindowSize, onResize)
+	onResize("", nil)
 
-	// Subscribe to window resize events
-	win.Subscribe(window.OnWindowSize, func(evname string, ev interface{}) {
-		// Updates viewport
-		width, height := win.Size()
-		gs.Viewport(0, 0, int32(width), int32(height))
-		// Updates camera aspect ratio
-		aspect := float32(width) / float32(height)
-		camera.SetAspect(aspect)
-	})
-
-	// Add an axis helper to the scene
-	axis := graphic.NewAxisHelper(2)
-	scene.Add(axis)
-
-	// Decodes model in in OBJ format
+	// Decode model in in OBJ format
 	dec, err := obj.Decode("gopher.obj", "gopher.mtl")
 	if err != nil {
 		panic(err.Error())
 	}
 
-	// Creates a new node with all the objects in the decoded file and adds it to the scene
+	// Create a new node with all the objects in the decoded file and adds it to the scene
 	group, err := dec.NewGroup()
 	if err != nil {
 		panic(err.Error())
 	}
+	group.SetScale(0.3, 0.3, 0.3)
+	group.SetPosition(0.0, -0.8, -0.2)
 	scene.Add(group)
 
-	// Creates a renderer and adds default shaders
-	rend := renderer.NewRenderer(gs)
-	err = rend.AddDefaultShaders()
-	if err != nil {
-		panic(err)
-	}
-	rend.SetScene(scene)
+	// Create and add ambient light to scene
+	scene.Add(light.NewAmbient(&math32.Color{1.0, 1.0, 1.0}, 0.8))
 
-	// Sets window background color
-	gs.ClearColor(0.6, 0.6, 0.6, 1.0)
+	// Create and add directional white light to the scene
+	dirLight := light.NewDirectional(&math32.Color{1, 1, 1}, 1.0)
+	dirLight.SetPosition(1, 0, 0)
+	scene.Add(dirLight)
 
-	// Render loop
-	for !win.ShouldClose() {
+	// Set background color to gray
+	a.Gls().ClearColor(0.5, 0.5, 0.5, 1.0)
 
-		// Clear buffers
-		gs.Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
-
-		// Render the scene using the specified camera
-		rend.Render(camera)
-
-		// Update window and checks for I/O events
-		win.SwapBuffers()
-		wmgr.PollEvents()
-	}
+	// Run the application
+	a.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
+		a.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
+		renderer.Render(scene, cam)
+	})
 }
