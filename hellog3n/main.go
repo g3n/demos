@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/camera"
-	"github.com/g3n/engine/camera/control"
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/geometry"
 	"github.com/g3n/engine/gls"
@@ -13,6 +12,7 @@ import (
 	"github.com/g3n/engine/material"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
+	"github.com/g3n/engine/util"
 	"github.com/g3n/engine/window"
 	"time"
 )
@@ -27,12 +27,12 @@ func main() {
 	gui.Manager().Set(scene)
 
 	// Create perspective camera
-	cam := camera.NewPerspective(65, 1, 0.01, 1000)
+	cam := camera.New(1)
 	cam.SetPosition(0, 0, 3)
 	scene.Add(cam)
 
 	// Set up orbit control for the camera
-	control.NewOrbitControl(cam)
+	camera.NewOrbitControl(cam)
 
 	// Set up callback to update viewport and camera aspect ratio when the window is resized
 	onResize := func(evname string, ev interface{}) {
@@ -67,7 +67,7 @@ func main() {
 	scene.Add(pointLight)
 
 	// Create and add an axis helper to the scene
-	scene.Add(graphic.NewAxisHelper(0.5))
+	scene.Add(util.NewAxisHelper(0.5))
 
 	// Set background color to gray
 	a.Gls().ClearColor(0.5, 0.5, 0.5, 1.0)

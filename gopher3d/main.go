@@ -3,7 +3,6 @@ package main
 import (
 	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/camera"
-	"github.com/g3n/engine/camera/control"
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/gui"
@@ -25,12 +24,12 @@ func main() {
 	gui.Manager().Set(scene)
 
 	// Create perspective camera
-	cam := camera.NewPerspective(65, 1, 0.01, 1000)
+	cam := camera.New(1)
 	cam.SetPosition(0, 0, 3)
 	scene.Add(cam)
 
 	// Set up orbit control for the camera
-	control.NewOrbitControl(cam)
+	camera.NewOrbitControl(cam)
 
 	// Set up callback to update viewport and camera aspect ratio when the window is resized
 	onResize := func(evname string, ev interface{}) {
