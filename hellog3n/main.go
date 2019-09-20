@@ -47,7 +47,7 @@ func main() {
 
 	// Create a blue torus and add it to the scene
 	geom := geometry.NewTorus(1, .4, 12, 32, math32.Pi*2)
-	mat := material.NewPhong(math32.NewColor("DarkBlue"))
+	mat := material.NewStandard(math32.NewColor("DarkBlue"))
 	mesh := graphic.NewMesh(geom, mat)
 	scene.Add(mesh)
 
