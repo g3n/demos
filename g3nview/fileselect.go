@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/gui/assets/icon"
 	"github.com/g3n/engine/math32"
@@ -83,9 +84,9 @@ func (fs *FileSelect) Show(show bool) {
 
 	if show {
 		fs.SetVisible(true)
-		parent := fs.Parent().(gui.IPanel).GetPanel()
-		px := (parent.Width() - fs.Width()) / 2
-		py := (parent.Height() - fs.Height()) / 2
+		width, height := app.App().GetSize()
+		px := (float32(width) - fs.Width()) / 2
+		py := (float32(height) - fs.Height()) / 2
 		fs.SetPosition(px, py)
 	} else {
 		fs.SetVisible(false)

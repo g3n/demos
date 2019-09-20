@@ -7,6 +7,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/g3n/engine/window"
 	"io"
 	"log"
 	"os"
@@ -17,7 +18,6 @@ import (
 	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/core"
 	"github.com/g3n/engine/gls"
-	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/gui/assets/icon"
 	"github.com/g3n/engine/light"
@@ -25,20 +25,22 @@ import (
 	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
+	"github.com/g3n/engine/util"
 )
 
 type g3nView struct {
-	*app.Application                     // Embedded application object
-	fs               *FileSelect         // File selection dialog
-	ed               *ErrorDialog        // Error dialog
-	axis             *graphic.AxisHelper // Axis helper
-	grid             *graphic.GridHelper // Grid helper
-	viewAxis         bool                // Axis helper visible flag
-	viewGrid         bool                // Grid helper visible flag
-	camPos           math32.Vector3      // Initial camera position
-	models           []*core.Node        // Models being shown
+	*app.Application                  // Embedded application object
+	fs               *FileSelect      // File selection dialog
+	ed               *ErrorDialog     // Error dialog
+	axis             *util.AxisHelper // Axis helper
+	grid             *util.GridHelper // Grid helper
+	viewAxis         bool             // Axis helper visible flag
+	viewGrid         bool             // Grid helper visible flag
+	camPos           math32.Vector3   // Initial camera position
+	models           []*core.Node     // Models being shown
 	scene            *core.Node
-	cam              *camera.Perspective
+	cam              *camera.Camera
+	orbit            *camera.OrbitControl
 }
 
 const (
@@ -67,22 +69,34 @@ func main() {
 	gv.scene.Add(dirLight)
 
 	// Add an axis helper to the scene initially not visible
-	gv.axis = graphic.NewAxisHelper(2)
+	gv.axis = util.NewAxisHelper(2)
 	gv.viewAxis = true
 	gv.axis.SetVisible(gv.viewAxis)
 	gv.scene.Add(gv.axis)
 
 	// Adds a grid helper to the scene initially not visible
-	gv.grid = graphic.NewGridHelper(50, 1, &math32.Color{0.4, 0.4, 0.4})
+	gv.grid = util.NewGridHelper(50, 1, &math32.Color{0.4, 0.4, 0.4})
 	gv.viewGrid = true
 	gv.grid.SetVisible(gv.viewGrid)
 	gv.scene.Add(gv.grid)
 
 	// Sets the initial camera position
 	gv.camPos = math32.Vector3{8.3, 4.7, 3.7}
-	gv.cam = camera.NewPerspective(65, 1, 0.01, 1000)
+	gv.cam = camera.New(1)
 	gv.cam.SetPositionVec(&gv.camPos)
-	gv.cam.LookAt(&math32.Vector3{0, 0, 0})
+	gv.cam.LookAt(&math32.Vector3{0, 0, 0}, &math32.Vector3{0, 1, 0})
+	gv.orbit = camera.NewOrbitControl(gv.cam)
+
+	// Set up callback to update viewport and camera aspect ratio when the window is resized
+	onResize := func(evname string, ev interface{}) {
+		// Get framebuffer size and update viewport accordingly
+		width, height := a.GetSize()
+		a.Gls().Viewport(0, 0, int32(width), int32(height))
+		// Update the camera's aspect ratio
+		gv.cam.SetAspect(float32(width) / float32(height))
+	}
+	a.Subscribe(window.OnWindowSize, onResize)
+	onResize("", nil)
 
 	// Build the user interface
 	gv.buildGui()
@@ -96,6 +110,9 @@ func main() {
 		}
 	}
 
+	// Set background color to gray
+	a.Gls().ClearColor(0.5, 0.5, 0.5, 1.0)
+
 	// Run application main render loop
 	a.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
 		a.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
@@ -106,10 +123,8 @@ func main() {
 
 // setupGui builds the GUI
 func (gv *g3nView) buildGui() error {
-	gui.Manager().Set(gv.scene)
 
-	// Sets the layout of the main gui root panel
-	// gv.Gui().SetLayout(gui.NewVBoxLayout())
+	gui.Manager().Set(gv.scene)
 
 	// Adds menu bar
 	mb := gui.NewMenuBar()
@@ -126,7 +141,8 @@ func (gv *g3nView) buildGui() error {
 	})
 	m1.AddOption("Reset camera").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
 		gv.cam.SetPositionVec(&gv.camPos)
-		gv.cam.LookAt(&math32.Vector3{0, 0, 0})
+		gv.cam.LookAt(&math32.Vector3{0, 0, 0}, &math32.Vector3{0, 1, 0})
+		gv.orbit.Reset()
 	})
 	m1.AddSeparator()
 	m1.AddOption("Quit").SetId("quit").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
@@ -182,14 +198,6 @@ func (gv *g3nView) buildGui() error {
 	// Creates error dialog
 	gv.ed = NewErrorDialog(600, 100)
 	gv.scene.Add(gv.ed)
-
-	// Sets panel for 3D area
-	panel3D := gui.NewPanel(0, 0)
-	panel3D.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 1, AlignH: gui.AlignWidth})
-	panel3D.SetRenderable(false)
-	panel3D.SetColor(math32.NewColor("gray"))
-	gv.scene.Add(panel3D)
-	// gv.Renderer().SetGuiPanel3D(panel3D) // TODO: fix
 
 	return nil
 }

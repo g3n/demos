@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/math32"
 )
@@ -28,6 +30,7 @@ func NewErrorDialog(width, height float32) *ErrorDialog {
 
 	// Creates error message label
 	e.msg = gui.NewImageLabel("")
+	e.msg.SetColor(math32.NewColor("black"))
 	e.msg.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 2, AlignH: gui.AlignWidth})
 	e.Add(e.msg)
 
@@ -45,9 +48,10 @@ func NewErrorDialog(width, height float32) *ErrorDialog {
 func (e *ErrorDialog) Show(msg string) {
 
 	e.msg.SetText(msg)
+	fmt.Println(msg)
 	e.SetVisible(true)
-	parent := e.Parent().(gui.IPanel).GetPanel()
-	px := (parent.Width() - e.Width()) / 2
-	py := (parent.Height() - e.Height()) / 2
+	width, height := app.App().GetSize()
+	px := (float32(width) - e.Width()) / 2
+	py := (float32(height) - e.Height()) / 2
 	e.SetPosition(px, py)
 }
