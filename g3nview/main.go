@@ -8,10 +8,15 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
+	"time"
 
+	"github.com/g3n/engine/app"
+	"github.com/g3n/engine/camera"
 	"github.com/g3n/engine/core"
+	"github.com/g3n/engine/gls"
 	"github.com/g3n/engine/graphic"
 	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/gui/assets/icon"
@@ -19,20 +24,21 @@ import (
 	"github.com/g3n/engine/loader/collada"
 	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/math32"
-	"github.com/g3n/engine/util/application"
-	"github.com/g3n/engine/util/logger"
+	"github.com/g3n/engine/renderer"
 )
 
 type g3nView struct {
-	*application.Application                     // Embedded application object
-	fs                       *FileSelect         // File selection dialog
-	ed                       *ErrorDialog        // Error dialog
-	axis                     *graphic.AxisHelper // Axis helper
-	grid                     *graphic.GridHelper // Grid helper
-	viewAxis                 bool                // Axis helper visible flag
-	viewGrid                 bool                // Grid helper visible flag
-	camPos                   math32.Vector3      // Initial camera position
-	models                   []*core.Node        // Models being shown
+	*app.Application                     // Embedded application object
+	fs               *FileSelect         // File selection dialog
+	ed               *ErrorDialog        // Error dialog
+	axis             *graphic.AxisHelper // Axis helper
+	grid             *graphic.GridHelper // Grid helper
+	viewAxis         bool                // Axis helper visible flag
+	viewGrid         bool                // Grid helper visible flag
+	camPos           math32.Vector3      // Initial camera position
+	models           []*core.Node        // Models being shown
+	scene            *core.Node
+	cam              *camera.Perspective
 }
 
 const (
@@ -47,71 +53,68 @@ func main() {
 
 	// Creates G3N application
 	gv := new(g3nView)
-	a, err := application.Create(application.Options{
-		Title:       "g3nview",
-		Width:       800,
-		Height:      600,
-		LogPrefix:   "g3nview",
-		LogLevel:    logger.DEBUG,
-		EnableFlags: true,
-	})
-	if err != nil {
-		panic(err)
-	}
+	a := app.App()
 	gv.Application = a
+	gv.scene = core.NewNode()
 
 	// Adds ambient light
 	ambLight := light.NewAmbient(math32.NewColor("white"), 0.5)
-	gv.Scene().Add(ambLight)
+	gv.scene.Add(ambLight)
 
 	// Add directional white light from right
 	dirLight := light.NewDirectional(math32.NewColor("white"), 1.0)
 	dirLight.SetPosition(1, 0, 0)
-	gv.Scene().Add(dirLight)
+	gv.scene.Add(dirLight)
 
 	// Add an axis helper to the scene initially not visible
 	gv.axis = graphic.NewAxisHelper(2)
 	gv.viewAxis = true
 	gv.axis.SetVisible(gv.viewAxis)
-	gv.Scene().Add(gv.axis)
+	gv.scene.Add(gv.axis)
 
 	// Adds a grid helper to the scene initially not visible
 	gv.grid = graphic.NewGridHelper(50, 1, &math32.Color{0.4, 0.4, 0.4})
 	gv.viewGrid = true
 	gv.grid.SetVisible(gv.viewGrid)
-	gv.Scene().Add(gv.grid)
+	gv.scene.Add(gv.grid)
 
 	// Sets the initial camera position
 	gv.camPos = math32.Vector3{8.3, 4.7, 3.7}
-	gv.CameraPersp().SetPositionVec(&gv.camPos)
-	gv.CameraPersp().LookAt(&math32.Vector3{0,0,0})
+	gv.cam = camera.NewPerspective(65, 1, 0.01, 1000)
+	gv.cam.SetPositionVec(&gv.camPos)
+	gv.cam.LookAt(&math32.Vector3{0, 0, 0})
 
 	// Build the user interface
 	gv.buildGui()
 
 	// Try to load models specified in the command line
 	for _, m := range flag.Args() {
-		err = gv.openModel(m)
+		err := gv.openModel(m)
 		if err != nil {
-			gv.Log().Error("%s", err)
+			log.Printf("error: %s", err)
 			return
 		}
 	}
 
 	// Run application main render loop
-	gv.Run()
+	a.Run(func(renderer *renderer.Renderer, deltaTime time.Duration) {
+		a.Gls().Clear(gls.DEPTH_BUFFER_BIT | gls.STENCIL_BUFFER_BIT | gls.COLOR_BUFFER_BIT)
+		renderer.Render(gv.scene, gv.cam)
+	})
+
 }
 
 // setupGui builds the GUI
 func (gv *g3nView) buildGui() error {
+	gui.Manager().Set(gv.scene)
 
 	// Sets the layout of the main gui root panel
-	gv.Gui().SetLayout(gui.NewVBoxLayout())
+	// gv.Gui().SetLayout(gui.NewVBoxLayout())
 
 	// Adds menu bar
 	mb := gui.NewMenuBar()
 	mb.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 0, AlignH: gui.AlignWidth})
-	gv.Gui().Add(mb)
+	gv.scene.Add(mb)
 
 	// Create "File" menu and adds it to the menu bar
 	m1 := gui.NewMenu()
@@ -122,13 +125,12 @@ func (gv *g3nView) buildGui() error {
 		gv.removeModels()
 	})
 	m1.AddOption("Reset camera").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		cam := gv.CameraPersp()
-		cam.SetPositionVec(&gv.camPos)
-		cam.LookAt(&math32.Vector3{0, 0, 0})
+		gv.cam.SetPositionVec(&gv.camPos)
+		gv.cam.LookAt(&math32.Vector3{0, 0, 0})
 	})
 	m1.AddSeparator()
 	m1.AddOption("Quit").SetId("quit").Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		gv.Quit()
+		gv.Exit()
 	})
 	mb.AddMenu("File", m1)
 
@@ -175,19 +177,19 @@ func (gv *g3nView) buildGui() error {
 	gv.fs.Subscribe("OnCancel", func(evname string, ev interface{}) {
 		gv.fs.Show(false)
 	})
-	gv.Gui().Add(gv.fs)
+	gv.scene.Add(gv.fs)
 
 	// Creates error dialog
 	gv.ed = NewErrorDialog(600, 100)
-	gv.Gui().Add(gv.ed)
+	gv.scene.Add(gv.ed)
 
 	// Sets panel for 3D area
 	panel3D := gui.NewPanel(0, 0)
 	panel3D.SetLayoutParams(&gui.VBoxLayoutParams{Expand: 1, AlignH: gui.AlignWidth})
 	panel3D.SetRenderable(false)
 	panel3D.SetColor(math32.NewColor("gray"))
-	gv.Gui().Add(panel3D)
-	gv.Renderer().SetGuiPanel3D(panel3D)
+	gv.scene.Add(panel3D)
+	// gv.Renderer().SetGuiPanel3D(panel3D) // TODO: fix
 
 	return nil
 }
@@ -219,7 +221,7 @@ func (gv *g3nView) openModel(fpath string) error {
 		if err != nil {
 			return err
 		}
-		gv.Scene().Add(group)
+		gv.scene.Add(group)
 		gv.models = append(gv.models, group)
 		return nil
 	}
@@ -237,7 +239,7 @@ func (gv *g3nView) openModel(fpath string) error {
 		if err != nil {
 			return err
 		}
-		gv.Scene().Add(s)
+		gv.scene.Add(s)
 		gv.models = append(gv.models, s.GetNode())
 		return nil
 	}
@@ -249,7 +251,7 @@ func (gv *g3nView) removeModels() {
 
 	for i := 0; i < len(gv.models); i++ {
 		model := gv.models[i]
-		gv.Scene().Remove(model)
+		gv.scene.Remove(model)
 		model.Dispose()
 	}
 }
