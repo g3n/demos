@@ -7,7 +7,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/g3n/engine/window"
 	"io"
 	"log"
 	"os"
@@ -25,19 +24,20 @@ import (
 	"github.com/g3n/engine/loader/obj"
 	"github.com/g3n/engine/math32"
 	"github.com/g3n/engine/renderer"
-	"github.com/g3n/engine/util"
+	"github.com/g3n/engine/util/helper"
+	"github.com/g3n/engine/window"
 )
 
 type g3nView struct {
-	*app.Application                  // Embedded application object
-	fs               *FileSelect      // File selection dialog
-	ed               *ErrorDialog     // Error dialog
-	axis             *util.AxisHelper // Axis helper
-	grid             *util.GridHelper // Grid helper
-	viewAxis         bool             // Axis helper visible flag
-	viewGrid         bool             // Grid helper visible flag
-	camPos           math32.Vector3   // Initial camera position
-	models           []*core.Node     // Models being shown
+	*app.Application                // Embedded application object
+	fs               *FileSelect    // File selection dialog
+	ed               *ErrorDialog   // Error dialog
+	axes             *helper.Axes   // Axis helper
+	grid             *helper.Grid   // Grid helper
+	viewAxes         bool           // Axis helper visible flag
+	viewGrid         bool           // Grid helper visible flag
+	camPos           math32.Vector3 // Initial camera position
+	models           []*core.Node   // Models being shown
 	scene            *core.Node
 	cam              *camera.Camera
 	orbit            *camera.OrbitControl
@@ -69,13 +69,13 @@ func main() {
 	gv.scene.Add(dirLight)
 
 	// Add an axis helper to the scene initially not visible
-	gv.axis = util.NewAxisHelper(2)
-	gv.viewAxis = true
-	gv.axis.SetVisible(gv.viewAxis)
-	gv.scene.Add(gv.axis)
+	gv.axes = helper.NewAxes(2)
+	gv.viewAxes = true
+	gv.axes.SetVisible(gv.viewAxes)
+	gv.scene.Add(gv.axes)
 
 	// Adds a grid helper to the scene initially not visible
-	gv.grid = util.NewGridHelper(50, 1, &math32.Color{0.4, 0.4, 0.4})
+	gv.grid = helper.NewGrid(50, 1, &math32.Color{0.4, 0.4, 0.4})
 	gv.viewGrid = true
 	gv.grid.SetVisible(gv.viewGrid)
 	gv.scene.Add(gv.grid)
@@ -153,11 +153,11 @@ func (gv *g3nView) buildGui() error {
 	// Create "View" menu and adds it to the menu bar
 	m2 := gui.NewMenu()
 	vAxis := m2.AddOption("View axis helper").SetIcon(checkOFF)
-	vAxis.SetIcon(getIcon(gv.viewAxis))
+	vAxis.SetIcon(getIcon(gv.viewAxes))
 	vAxis.Subscribe(gui.OnClick, func(evname string, ev interface{}) {
-		gv.viewAxis = !gv.viewAxis
-		vAxis.SetIcon(getIcon(gv.viewAxis))
-		gv.axis.SetVisible(gv.viewAxis)
+		gv.viewAxes = !gv.viewAxes
+		vAxis.SetIcon(getIcon(gv.viewAxes))
+		gv.axes.SetVisible(gv.viewAxes)
 	})
 
 	vGrid := m2.AddOption("View grid helper").SetIcon(checkOFF)
