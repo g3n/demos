@@ -37,7 +37,7 @@ func main() {
 	// Set up callback to update viewport and camera aspect ratio when the window is resized
 	onResize := func(evname string, ev interface{}) {
 		// Get framebuffer size and update viewport accordingly
-		width, height := a.GetSize()
+		width, height := a.GetFramebufferSize()
 		a.Gls().Viewport(0, 0, int32(width), int32(height))
 		// Update the camera's aspect ratio
 		cam.SetAspect(float32(width) / float32(height))
