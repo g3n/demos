@@ -1,13 +1,14 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
+	"sort"
+
 	"github.com/g3n/engine/app"
 	"github.com/g3n/engine/gui"
 	"github.com/g3n/engine/gui/assets/icon"
 	"github.com/g3n/engine/math32"
-	"os"
-	"path/filepath"
-	"sort"
 )
 
 type FileSelect struct {
@@ -161,7 +162,6 @@ func (fs *FileSelect) onSelect() {
 	s, err := os.Stat(path)
 	if err != nil {
 		panic(err)
-		return
 	}
 	if s.IsDir() {
 		fs.SetPath(path)
